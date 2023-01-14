@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ExecutorServiceClient interface {
-	Execute(ctx context.Context, in *Command, opts ...grpc.CallOption) (*ExecuteResult, error)
+	Execute(ctx context.Context, in *ExecutionTask, opts ...grpc.CallOption) (*ExecuteResult, error)
 }
 
 type executorServiceClient struct {
@@ -33,7 +33,7 @@ func NewExecutorServiceClient(cc grpc.ClientConnInterface) ExecutorServiceClient
 	return &executorServiceClient{cc}
 }
 
-func (c *executorServiceClient) Execute(ctx context.Context, in *Command, opts ...grpc.CallOption) (*ExecuteResult, error) {
+func (c *executorServiceClient) Execute(ctx context.Context, in *ExecutionTask, opts ...grpc.CallOption) (*ExecuteResult, error) {
 	out := new(ExecuteResult)
 	err := c.cc.Invoke(ctx, "/task.ExecutorService/Execute", in, out, opts...)
 	if err != nil {
@@ -46,7 +46,7 @@ func (c *executorServiceClient) Execute(ctx context.Context, in *Command, opts .
 // All implementations must embed UnimplementedExecutorServiceServer
 // for forward compatibility
 type ExecutorServiceServer interface {
-	Execute(context.Context, *Command) (*ExecuteResult, error)
+	Execute(context.Context, *ExecutionTask) (*ExecuteResult, error)
 	mustEmbedUnimplementedExecutorServiceServer()
 }
 
@@ -54,7 +54,7 @@ type ExecutorServiceServer interface {
 type UnimplementedExecutorServiceServer struct {
 }
 
-func (UnimplementedExecutorServiceServer) Execute(context.Context, *Command) (*ExecuteResult, error) {
+func (UnimplementedExecutorServiceServer) Execute(context.Context, *ExecutionTask) (*ExecuteResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Execute not implemented")
 }
 func (UnimplementedExecutorServiceServer) mustEmbedUnimplementedExecutorServiceServer() {}
@@ -71,7 +71,7 @@ func RegisterExecutorServiceServer(s grpc.ServiceRegistrar, srv ExecutorServiceS
 }
 
 func _ExecutorService_Execute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Command)
+	in := new(ExecutionTask)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func _ExecutorService_Execute_Handler(srv interface{}, ctx context.Context, dec 
 		FullMethod: "/task.ExecutorService/Execute",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ExecutorServiceServer).Execute(ctx, req.(*Command))
+		return srv.(ExecutorServiceServer).Execute(ctx, req.(*ExecutionTask))
 	}
 	return interceptor(ctx, in, info, handler)
 }
