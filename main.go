@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/go-redis/redis/v9"
+	c "github.com/wangning057/scheduler/executeServiceClient"
 	"github.com/wangning057/scheduler/service/task"
 	"google.golang.org/grpc"
 )
@@ -24,8 +25,8 @@ func init() {
 }
 
 // 实现 ExecutorServiceServer 接口
-type executorServiceServer struct {
-	task.UnimplementedExecutorServiceServer
+type executeServiceServer struct {
+	task.UnimplementedExecuteServiceServer
 }
 
 /*
@@ -36,24 +37,39 @@ type executorServiceServer struct {
 2.将任务发给executor执行
 3.将执行结果发送给ninja客户端
 */
-func (e *executorServiceServer) Execute(ctx context.Context, in *task.ExecutionTask) (*task.ExecuteResult, error) {
+func (e *executeServiceServer) Execute(ctx context.Context, t *task.ExecutionTask) (*task.ExecuteResult, error) {
 	// TODO
 	// 1.设置任务在redis中的状态为"ready"
-	action_id := in.GetActionId()
-	err := rdb.Set(ctx, action_id, "ready", 0).Err()
+	taskId := t.GetTaskId()
+	err := rdb.Set(ctx, taskId, "ready", 0).Err()
 	if err != nil {
-		log.Fatalf("设置任务%+v在redis中的状态为ready失败", action_id)
+		log.Fatalf("设置任务%+v在redis中的状态为ready失败", taskId)
 	}
 	// 2.将任务发给executor执行
-	// TODO:需要先写与executor的连接部分的客户端代码
 
+	// BUG:下面这两个应该是开两个goroutine同时执行，，用channel拿返回值，然后返回非nil的那一个res，而不是一个一个执行
+	res1, err1 := c.Client1.Execute(ctx, t)
+	if err1 != nil {
+		log.Fatalln("res1, err1 := c.Client1.Execute(ctx, t)失败", err1)
+	}
+	res2, err2 := c.Client2.Execute(ctx, t)
+	if err2 != nil {
+		log.Fatalln("res2, err2 := c.Client2.Execute(ctx, t)失败", err2)
+	}
+
+	//返回res1和res2中非nil的那个
+	if res1 != nil {
+		return res1, nil
+	} else {
+		return res2, nil
+	}
 }
 
 func main() {
 
 	//相对于ninja的gRPC服务端
 	server := grpc.NewServer()
-	task.RegisterExecutorServiceServer(server, &executorServiceServer{})
+	task.RegisterExecuteServiceServer(server, &executeServiceServer{})
 	listener, err := net.Listen("tcp", ":8002")
 	if err != nil {
 		log.Fatal("从ninja客户端接收到任务的服务监听端口失败", err)

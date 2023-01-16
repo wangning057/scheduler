@@ -18,86 +18,88 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// ExecutorServiceClient is the client API for ExecutorService service.
+// ExecuteServiceClient is the client API for ExecuteService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ExecutorServiceClient interface {
+type ExecuteServiceClient interface {
+	// 发送任务，返回执行结果
 	Execute(ctx context.Context, in *ExecutionTask, opts ...grpc.CallOption) (*ExecuteResult, error)
 }
 
-type executorServiceClient struct {
+type executeServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewExecutorServiceClient(cc grpc.ClientConnInterface) ExecutorServiceClient {
-	return &executorServiceClient{cc}
+func NewExecuteServiceClient(cc grpc.ClientConnInterface) ExecuteServiceClient {
+	return &executeServiceClient{cc}
 }
 
-func (c *executorServiceClient) Execute(ctx context.Context, in *ExecutionTask, opts ...grpc.CallOption) (*ExecuteResult, error) {
+func (c *executeServiceClient) Execute(ctx context.Context, in *ExecutionTask, opts ...grpc.CallOption) (*ExecuteResult, error) {
 	out := new(ExecuteResult)
-	err := c.cc.Invoke(ctx, "/task.ExecutorService/Execute", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/task.ExecuteService/Execute", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// ExecutorServiceServer is the server API for ExecutorService service.
-// All implementations must embed UnimplementedExecutorServiceServer
+// ExecuteServiceServer is the server API for ExecuteService service.
+// All implementations must embed UnimplementedExecuteServiceServer
 // for forward compatibility
-type ExecutorServiceServer interface {
+type ExecuteServiceServer interface {
+	// 发送任务，返回执行结果
 	Execute(context.Context, *ExecutionTask) (*ExecuteResult, error)
-	mustEmbedUnimplementedExecutorServiceServer()
+	mustEmbedUnimplementedExecuteServiceServer()
 }
 
-// UnimplementedExecutorServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedExecutorServiceServer struct {
+// UnimplementedExecuteServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedExecuteServiceServer struct {
 }
 
-func (UnimplementedExecutorServiceServer) Execute(context.Context, *ExecutionTask) (*ExecuteResult, error) {
+func (UnimplementedExecuteServiceServer) Execute(context.Context, *ExecutionTask) (*ExecuteResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Execute not implemented")
 }
-func (UnimplementedExecutorServiceServer) mustEmbedUnimplementedExecutorServiceServer() {}
+func (UnimplementedExecuteServiceServer) mustEmbedUnimplementedExecuteServiceServer() {}
 
-// UnsafeExecutorServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ExecutorServiceServer will
+// UnsafeExecuteServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ExecuteServiceServer will
 // result in compilation errors.
-type UnsafeExecutorServiceServer interface {
-	mustEmbedUnimplementedExecutorServiceServer()
+type UnsafeExecuteServiceServer interface {
+	mustEmbedUnimplementedExecuteServiceServer()
 }
 
-func RegisterExecutorServiceServer(s grpc.ServiceRegistrar, srv ExecutorServiceServer) {
-	s.RegisterService(&ExecutorService_ServiceDesc, srv)
+func RegisterExecuteServiceServer(s grpc.ServiceRegistrar, srv ExecuteServiceServer) {
+	s.RegisterService(&ExecuteService_ServiceDesc, srv)
 }
 
-func _ExecutorService_Execute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ExecuteService_Execute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ExecutionTask)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ExecutorServiceServer).Execute(ctx, in)
+		return srv.(ExecuteServiceServer).Execute(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/task.ExecutorService/Execute",
+		FullMethod: "/task.ExecuteService/Execute",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ExecutorServiceServer).Execute(ctx, req.(*ExecutionTask))
+		return srv.(ExecuteServiceServer).Execute(ctx, req.(*ExecutionTask))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// ExecutorService_ServiceDesc is the grpc.ServiceDesc for ExecutorService service.
+// ExecuteService_ServiceDesc is the grpc.ServiceDesc for ExecuteService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var ExecutorService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "task.ExecutorService",
-	HandlerType: (*ExecutorServiceServer)(nil),
+var ExecuteService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "task.ExecuteService",
+	HandlerType: (*ExecuteServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Execute",
-			Handler:    _ExecutorService_Execute_Handler,
+			Handler:    _ExecuteService_Execute_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
