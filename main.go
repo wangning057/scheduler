@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/go-redis/redis/v9"
 	c "github.com/wangning057/scheduler/executeServiceClient"
+	"github.com/wangning057/scheduler/returner"
 	"github.com/wangning057/scheduler/service/task"
 	"google.golang.org/grpc"
 )
@@ -48,21 +51,61 @@ func (e *executeServiceServer) Execute(ctx context.Context, t *task.ExecutionTas
 	// 2.将任务发给executor执行
 
 	// BUG:下面这两个应该是开两个goroutine同时执行，，用channel拿返回值，然后返回非nil的那一个res，而不是一个一个执行
-	res1, err1 := c.Client1.Execute(ctx, t)
-	if err1 != nil {
-		log.Fatalln("res1, err1 := c.Client1.Execute(ctx, t)失败", err1)
-	}
-	res2, err2 := c.Client2.Execute(ctx, t)
-	if err2 != nil {
-		log.Fatalln("res2, err2 := c.Client2.Execute(ctx, t)失败", err2)
-	}
+	// res1, err1 := c.Client1.Execute(ctx, t) 
+	// if err1 != nil {
+	// 	log.Fatalln("res1, err1 := c.Client1.Execute(ctx, t)失败", err1)
+	// }
+	// res2, err2 := c.Client2.Execute(ctx, t)
+	// if err2 != nil {
+	// 	log.Fatalln("res2, err2 := c.Client2.Execute(ctx, t)失败", err2)
+	// }
 
-	//返回res1和res2中非nil的那个
-	if res1 != nil {
-		return res1, nil
-	} else {
-		return res2, nil
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		res1, err1 := c.Client1.Execute(ctx, t)
+		
+		returner.InitChan(taskId)
+		if err1 != nil {
+			log.Fatalln("res1, err1 := c.Client1.Execute(ctx, t)失败", err1)
+		}
+		if res1 != nil {
+			returner.SetRes(taskId, res1)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		res2, err2 := c.Client2.Execute(ctx, t)
+		taskId := t.GetTaskId() 
+		returner.InitChan(taskId)
+		if err2 != nil {
+			log.Fatalln("res2, err2 := c.Client2.Execute(ctx, t)失败", err2)
+		}
+		if res2 != nil {
+			returner.SetRes(taskId, res2)
+		}
+	}()
+
+	wg.Wait() //此时两个goroutine执行完
+
+	// //返回res1和res2中非nil的那个
+	// if res1 != nil {
+	// 	return res1, nil
+	// } else {
+	// 	return res2, nil
+	// }
+
+	// 通过returner 来获取返回结果
+	res := returner.GetRes(taskId)
+	var err3 error
+	if res == nil {
+		err3 = errors.New("两个executor执行结果都为nil")
+		log.Fatalf("两个executor执行结果都为nil，任务id是%v", taskId)
 	}
+	return res, err3
 }
 
 func main() {
