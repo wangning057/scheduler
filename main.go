@@ -11,6 +11,7 @@ import (
 	"github.com/go-redis/redis/v9"
 	c "github.com/wangning057/scheduler/executeServiceClient"
 	"github.com/wangning057/scheduler/returner"
+	"github.com/wangning057/scheduler/service/execute"
 	"github.com/wangning057/scheduler/service/task"
 	"google.golang.org/grpc"
 )
@@ -21,7 +22,7 @@ var rdb *redis.Client
 func init() {
 	fmt.Println("init in main.go")
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     "172.17.0.45:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -51,7 +52,7 @@ func (e *executeServiceServer) Execute(ctx context.Context, t *task.ExecutionTas
 	// 2.将任务发给executor执行
 
 	// BUG:下面这两个应该是开两个goroutine同时执行，，用channel拿返回值，然后返回非nil的那一个res，而不是一个一个执行
-	// res1, err1 := c.Client1.Execute(ctx, t) 
+	// res1, err1 := c.Client1.Execute(ctx, t)
 	// if err1 != nil {
 	// 	log.Fatalln("res1, err1 := c.Client1.Execute(ctx, t)失败", err1)
 	// }
@@ -60,34 +61,49 @@ func (e *executeServiceServer) Execute(ctx context.Context, t *task.ExecutionTas
 	// 	log.Fatalln("res2, err2 := c.Client2.Execute(ctx, t)失败", err2)
 	// }
 
+	var executor_t = &execute.ExecutionTask{
+		TaskId: t.GetTaskId(),
+		Command: t.GetCommand(),
+		UseConsole: t.GetUseConsole(),
+		IOBusy: t.GetIOBusy(),
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go func() {
+	go func(ctx context.Context, in *execute.ExecutionTask) {
 		defer wg.Done()
-		res1, err1 := c.Client1.Execute(ctx, t)
-		
+		res1, err1 := c.Client1.Execute(ctx, executor_t)
+
 		returner.InitChan(taskId)
 		if err1 != nil {
 			log.Fatalln("res1, err1 := c.Client1.Execute(ctx, t)失败", err1)
 		}
 		if res1 != nil {
-			returner.SetRes(taskId, res1)
+			task_res := &task.ExecuteResult{
+				Signal: res1.GetSignal(),
+				TaskId: res1.GetTaskId(),
+			}
+			returner.SetRes(taskId, task_res)
 		}
-	}()
+	}(ctx, executor_t)
 
-	go func() {
+	go func(ctx context.Context, in *execute.ExecutionTask) {
 		defer wg.Done()
-		res2, err2 := c.Client2.Execute(ctx, t)
-		taskId := t.GetTaskId() 
+		res2, err2 := c.Client2.Execute(ctx, executor_t)
+		taskId := t.GetTaskId()
 		returner.InitChan(taskId)
 		if err2 != nil {
 			log.Fatalln("res2, err2 := c.Client2.Execute(ctx, t)失败", err2)
 		}
 		if res2 != nil {
-			returner.SetRes(taskId, res2)
+			task_res := &task.ExecuteResult{
+				Signal: res2.GetSignal(),
+				TaskId: res2.GetTaskId(),
+			}
+			returner.SetRes(taskId, task_res)
 		}
-	}()
+	}(ctx, executor_t)
 
 	wg.Wait() //此时两个goroutine执行完
 
